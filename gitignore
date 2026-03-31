@@ -1,0 +1,35 @@
+# Local configuration (contains passwords!)
+config.local.php
+
+# Backup copies of config
+config1.php
+config3.php
+
+# Numbered backup files (old versions)
+*[0-9].php
+*[0-9]-*.php
+
+# Old header versions
+includes/header[0-9]*.php
+
+# Old language file versions
+lang/sv[0-9]*.php
+lang/en[0-9]*.php
+
+# Logs
+*.log
+php_errors.log
+
+# Backup folder
+backup/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*

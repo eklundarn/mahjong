@@ -1,0 +1,46 @@
+# KONFIDENTIELLA FILER - COMMIT ALDRIG DESSA!
+config.local.php
+database.php
+
+# Backup-filer
+*.backup
+*.bak
+backups/
+
+# Loggar
+logs/
+*.log
+error_log
+
+# Temporära filer
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE-filer
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uppladdade filer (om ni implementerar filuppladdning)
+uploads/*
+!uploads/.gitkeep
+
+# Miljöspecifika filer
+.env
+.env.local
+
+# Composer (om ni använder det i framtiden)
+/vendor/
+composer.lock
+
+# NPM (om ni använder det i framtiden)
+node_modules/
+package-lock.json
+
+# Cache
+cache/
+*.cache

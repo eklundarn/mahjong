@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mahjong Seating Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f1a14; --surface:#172212; --card:#1e2e1a; --border:#2d4a26;
+  --gold:#c9a84c; --gold2:#e8c87a; --green:#4a8c3f; --green2:#6ab55e;
+  --red:#c94040; --text:#e8e0d0; --muted:#8a9e84; --blue:#4a7cbc;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(74,140,63,.15) 0%,transparent 50%),
+                   radial-gradient(ellipse at 80% 100%,rgba(201,168,76,.1) 0%,transparent 50%);}
+header{padding:24px 48px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px;position:relative;overflow:hidden;}
+header::before{content:'麻雀';position:absolute;right:48px;top:50%;transform:translateY(-50%);
+  font-family:'Noto Serif JP',serif;font-size:5rem;font-weight:900;color:rgba(201,168,76,.05);pointer-events:none;}
+.logo-tile{width:50px;height:50px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-family:'Noto Serif JP',serif;
+  font-size:1.4rem;font-weight:900;color:#1a1000;box-shadow:0 4px 16px rgba(201,168,76,.35);flex-shrink:0;}
+.header-text h1{font-family:'Noto Serif JP',serif;font-size:1.35rem;font-weight:700;color:var(--gold2);}
+.header-text p{font-size:.72rem;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;}
+
+.container{max-width:1200px;margin:0 auto;padding:0 24px;}
+.setup-section{padding:32px 0;}
+.section-title{font-size:.67rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);
+  margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--border),transparent);}
+
+/* ── SETUP GRID ── */
+.setup-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+.field{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 17px;transition:border-color .2s;}
+.field:hover{border-color:var(--green);}
+.field label{display:block;font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+.field input,.field select{width:100%;background:transparent;border:none;color:var(--text);
+  font-family:'DM Mono',monospace;font-size:1.25rem;font-weight:500;outline:none;}
+.field input::-webkit-inner-spin-button{display:none;}
+.field select{font-size:.9rem;cursor:pointer;}
+.field select option{background:#1e2e1a;}
+.field .hint{font-size:.67rem;color:var(--muted);margin-top:4px;}
+
+/* ── IMPORT AREA ── */
+.import-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+.import-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.import-header h3{font-family:'Noto Serif JP',serif;font-size:.95rem;color:var(--gold);}
+.import-header p{font-size:.73rem;color:var(--muted);margin-top:3px;line-height:1.5;}
+
+.drop-zone{
+  border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;
+  cursor:pointer;transition:all .2s;position:relative;
+}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:rgba(74,140,63,.07);}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-icon{font-size:2rem;margin-bottom:10px;}
+.drop-zone p{font-size:.83rem;color:var(--muted);}
+.drop-zone strong{color:var(--text);}
+.drop-zone .filetypes{margin-top:6px;font-size:.7rem;color:var(--muted);font-family:'DM Mono',monospace;}
+
+.col-format{margin-top:14px;display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+.col-box{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;padding:8px;text-align:center;}
+.col-box .cn{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--gold);margin-bottom:3px;}
+.col-box .cv{font-size:.7rem;color:var(--muted);}
+
+/* ── IMPORT PREVIEW ── */
+.import-preview{margin-top:16px;}
+.preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.preview-header h4{font-size:.83rem;color:var(--green2);}
+.preview-header .pc{font-family:'DM Mono',monospace;font-size:.75rem;color:var(--muted);}
+.preview-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+.preview-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.preview-table th{background:var(--surface);color:var(--muted);font-size:.63rem;letter-spacing:.1em;
+  text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+.preview-table td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);}
+.preview-table tr:last-child td{border-bottom:none;}
+.preview-table tr:hover td{background:rgba(255,255,255,.02);}
+.flag{font-size:1rem;margin-right:4px;}
+.country-code{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);}
+.team-tag{font-size:.65rem;padding:2px 7px;background:rgba(201,168,76,.12);
+  border:1px solid rgba(201,168,76,.25);color:var(--gold);border-radius:20px;}
+.no-team{font-size:.65rem;color:var(--muted);font-style:italic;}
+.clear-btn{background:rgba(201,64,64,.15);border:1px solid rgba(201,64,64,.3);color:var(--red);
+  border-radius:6px;padding:5px 14px;cursor:pointer;font-size:.75rem;transition:all .2s;}
+.clear-btn:hover{background:rgba(201,64,64,.3);}
+
+/* ── MANUAL TEAMS ── */
+.teams-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:22px;}
+.teams-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.teams-header h3{font-family:'Noto Serif JP',serif;font-size:.95rem;color:var(--gold);}
+.teams-header p{font-size:.73rem;color:var(--muted);margin-top:3px;}
+.badge{font-family:'DM Mono',monospace;font-size:.75rem;color:var(--muted);}
+.col-hdr{display:grid;grid-template-columns:150px 1fr 1fr 1fr 1fr 36px;gap:8px;margin-bottom:6px;}
+.col-hdr span{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0 10px;}
+.team-list{display:flex;flex-direction:column;gap:8px;}
+.team-row{display:grid;grid-template-columns:150px 1fr 1fr 1fr 1fr 36px;gap:8px;align-items:center;}
+.team-row input{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;
+  padding:7px 10px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:.82rem;
+  outline:none;width:100%;transition:border-color .2s;}
+.team-row input:focus{border-color:var(--green);}
+.team-row input.tname{font-weight:500;color:var(--gold2);}
+.btn-rm{width:32px;height:32px;background:rgba(201,64,64,.15);border:1px solid rgba(201,64,64,.3);
+  color:var(--red);border-radius:6px;cursor:pointer;font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.btn-rm:hover{background:rgba(201,64,64,.3);}
+.btn-add{margin-top:10px;background:rgba(74,140,63,.12);border:1px dashed var(--border);
+  color:var(--green2);border-radius:8px;padding:9px;width:100%;cursor:pointer;
+  font-family:'Noto Sans JP',sans-serif;font-size:.82rem;transition:all .2s;}
+.btn-add:hover{border-color:var(--green);background:rgba(74,140,63,.22);}
+
+.btn-gen{background:linear-gradient(135deg,var(--green),var(--green2));border:none;color:white;
+  padding:15px 44px;font-family:'Noto Serif JP',serif;font-size:.95rem;font-weight:700;
+  border-radius:10px;cursor:pointer;letter-spacing:.05em;
+  box-shadow:0 4px 20px rgba(74,140,63,.35);transition:all .2s;display:flex;align-items:center;gap:10px;}
+.btn-gen:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(74,140,63,.45);}
+.btn-gen:active{transform:translateY(0);}
+
+/* ── STATS / QUALITY ── */
+.stats-bar{display:flex;gap:20px;padding:14px 22px;background:var(--card);
+  border:1px solid var(--border);border-radius:10px;margin-bottom:24px;flex-wrap:wrap;}
+.stat{display:flex;flex-direction:column;gap:2px;}
+.stat-val{font-family:'DM Mono',monospace;font-size:1.2rem;font-weight:500;color:var(--gold2);}
+.stat-lbl{font-size:.64rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.sdiv{width:1px;background:var(--border);align-self:stretch;}
+.quality-report{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:24px;}
+.quality-title{font-family:'Noto Serif JP',serif;font-size:.82rem;color:var(--gold);margin-bottom:14px;letter-spacing:.06em;}
+.quality-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.qi{display:flex;flex-direction:column;gap:3px;}
+.qi .qv{font-family:'DM Mono',monospace;font-size:1rem;font-weight:500;}
+.qi .ql{font-size:.7rem;color:var(--muted);}
+.qgood{color:#6ab55e;} .qwarn{color:var(--gold);} .qbad{color:var(--red);}
+
+/* ── VIEW TABS ── */
+.view-tabs{display:flex;gap:4px;background:var(--card);padding:4px;border-radius:10px;
+  border:1px solid var(--border);margin-bottom:24px;width:fit-content;}
+.vtab{padding:8px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;
+  border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:.82rem;font-weight:500;transition:all .2s;}
+.vtab.active{background:var(--green);color:white;box-shadow:0 2px 8px rgba(74,140,63,.4);}
+.print-btns{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;}
+.btn-print{padding:9px 22px;border-radius:8px;border:1px solid var(--border);background:var(--card);
+  color:var(--text);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:.82rem;
+  transition:all .2s;display:flex;align-items:center;gap:8px;}
+.btn-print:hover{border-color:var(--gold);color:var(--gold);}
+
+/* ── ROUND VIEW ── */
+.round-section{margin-bottom:32px;}
+.round-title{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.round-badge{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1000;
+  font-family:'Noto Serif JP',serif;font-size:.7rem;font-weight:700;padding:3px 13px;border-radius:20px;letter-spacing:.08em;}
+.round-title h3{font-family:'Noto Serif JP',serif;font-size:1rem;}
+.round-title .rmeta{font-size:.72rem;color:var(--muted);font-family:'DM Mono',monospace;}
+.tables-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s;}
+.table-card:hover{border-color:var(--green);}
+.table-head{background:var(--surface);padding:9px 15px;display:flex;justify-content:space-between;
+  align-items:center;border-bottom:1px solid var(--border);}
+.table-num{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted);letter-spacing:.1em;}
+.table-tbadge{font-size:.65rem;padding:2px 8px;background:rgba(201,168,76,.12);
+  border:1px solid rgba(201,168,76,.25);color:var(--gold);border-radius:20px;}
+.seats{padding:10px;display:flex;flex-direction:column;gap:5px;}
+.seat{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;}
+.seat.east{background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);}
+.wbadge{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:700;font-family:'DM Mono',monospace;flex-shrink:0;}
+.wE{background:rgba(201,168,76,.22);color:var(--gold2);border:1px solid rgba(201,168,76,.38);}
+.wS,.wW,.wN{background:rgba(255,255,255,.05);color:#888;}
+.seat-info{flex:1;min-width:0;}
+.seat-name{font-size:.87rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.seat-sub{font-size:.65rem;color:var(--muted);display:flex;align-items:center;gap:4px;margin-top:1px;}
+.seat-flag{font-size:.85rem;}
+.seat-id{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);width:24px;text-align:right;flex-shrink:0;}
+
+/* ── PLAYER VIEW ── */
+.player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.player-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.player-head{padding:13px 16px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:11px;}
+.player-num{width:32px;height:32px;background:var(--green);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.75rem;color:white;flex-shrink:0;}
+.player-info h4{font-size:.88rem;font-weight:500;}
+.player-info .pt{font-size:.68rem;color:var(--gold);margin-top:1px;}
+.player-info .pm{font-size:.65rem;color:var(--muted);margin-top:1px;font-family:'DM Mono',monospace;}
+.player-sched{padding:10px;}
+.pr{display:flex;align-items:center;gap:9px;padding:5px 9px;border-radius:5px;font-size:.8rem;}
+.pr:nth-child(odd){background:rgba(255,255,255,.02);}
+.prr{font-family:'DM Mono',monospace;font-size:.67rem;color:var(--muted);width:22px;flex-shrink:0;}
+.prt{font-family:'DM Mono',monospace;font-size:.73rem;width:55px;flex-shrink:0;}
+.prw{font-size:.66rem;padding:1px 7px;border-radius:10px;font-weight:500;width:30px;text-align:center;flex-shrink:0;}
+.prwE{background:rgba(201,168,76,.18);color:var(--gold2);}
+.prwS,.prwW,.prwN{background:rgba(255,255,255,.05);color:#999;}
+
+#results-section{display:none;padding-bottom:60px;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:white;padding:10px 24px;border-radius:8px;
+  font-size:.83rem;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;}
+.toast.show{opacity:1;}
+
+@media(max-width:700px){
+  .setup-grid{grid-template-columns:1fr 1fr;}
+  .col-hdr,.team-row{grid-template-columns:120px 1fr 1fr 36px;}
+  .col-hdr span:nth-child(n+4),.team-row input:nth-child(n+4){display:none;}
+  .col-format{grid-template-columns:repeat(3,1fr);}
+  header::before{display:none;} header{padding:20px;}
+}
+
+@media print{
+  body{background:white!important;color:black!important;}
+  header,.setup-section,.print-btns,.view-tabs,.stats-bar,.quality-report,
+  .import-section,.teams-section{display:none!important;}
+  #results-section{display:block!important;}
+  :root{--bg:white;--card:white;--surface:#f5f5f5;--text:black;--muted:#666;
+    --border:#ddd;--gold:#8a6428;--gold2:#8a6428;--green:#2d6a2d;--green2:#2d6a2d;}
+  .table-card,.player-card{border:1px solid #ccc!important;break-inside:avoid;}
+  .seat.east{background:#fffbe6!important;border:1px solid #c9a84c!important;}
+  .wE{background:#f5e6c0!important;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-tile">東</div>
+  <div class="header-text">
+    <h1>Mahjong Seating Generator</h1>
+    <p>Tournament Scheduler · Player Import · Social Golfer Optimization · East Rotation</p>
+  </div>
+</header>
+
+<div class="container">
+<div class="setup-section">
+  <div class="section-title">Tournament Setup</div>
+
+  <div class="setup-grid">
+    <div class="field">
+      <label>Number of Tables</label>
+      <input type="number" id="numTables" min="1" max="30" value="5">
+      <div class="hint">1–30 tables · 4 players each</div>
+    </div>
+    <div class="field">
+      <label>Number of Rounds</label>
+      <input type="number" id="numRounds" min="1" max="12" value="7">
+      <div class="hint">2-day: 7 · 1-day: 4</div>
+    </div>
+    <div class="field">
+      <label>Total Players</label>
+      <input type="number" id="numPlayers" value="20" readonly>
+      <div class="hint">Auto: tables × 4</div>
+    </div>
+  </div>
+
+  <!-- IMPORT -->
+  <div class="import-section">
+    <div class="import-header">
+      <div>
+        <h3>📋 Import Player List</h3>
+        <p>Import from Excel (.xlsx/.xls) or text file (.csv/.txt) · Columns: First name, Last name, EMA number, Country name (Sweden / Germany…), Club, Team</p>
+      </div>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">📂</div>
+      <p><strong>Drop file here</strong> or click to browse</p>
+      <div class="filetypes">.xlsx · .xls · .csv · .txt</div>
+    </div>
+
+    <div class="col-format">
+      <div class="col-box"><div class="cn">Col 1</div><div class="cv">First Name</div></div>
+      <div class="col-box"><div class="cn">Col 2</div><div class="cv">Last Name</div></div>
+      <div class="col-box"><div class="cn">Col 3</div><div class="cv">EMA Number</div></div>
+      <div class="col-box"><div class="cn">Col 4</div><div class="cv">Country (Sweden, Germany…)</div></div>
+      <div class="col-box"><div class="cn">Col 5</div><div class="cv">Club (optional)</div></div>
+      <div class="col-box"><div class="cn">Col 6</div><div class="cv">Team (optional)</div></div>
+    </div>
+
+    <div class="import-preview" id="importPreview" style="display:none">
+      <div class="preview-header">
+        <h4 id="previewTitle">Players imported</h4>
+        <button class="clear-btn" onclick="clearImport()">✕ Clear</button>
+      </div>
+      <div class="preview-table-wrap">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>EMA</th><th>Country</th><th>Club</th><th>Team</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL TEAMS (shown when no import or to supplement) -->
+  <div class="teams-section" id="manualTeams">
+    <div class="teams-header">
+      <div>
+        <h3>🀄 Manual Teams</h3>
+        <p>Add teams manually · Remaining slots filled with auto-named Mahjong groups</p>
+      </div>
+      <span class="badge" id="tcBadge">0 teams</span>
+    </div>
+    <div class="col-hdr">
+      <span>Team Name</span><span>Player 1</span><span>Player 2</span>
+      <span>Player 3</span><span>Player 4</span><span></span>
+    </div>
+    <div class="team-list" id="teamList"></div>
+    <button class="btn-add" onclick="addTeam()">＋ Add Manual Team</button>
+  </div>
+
+  <button class="btn-gen" onclick="generate()">
+    <span style="font-size:1.1rem">🀇</span>
+    Generate Tournament Schedule
+  </button>
+</div>
+
+<!-- RESULTS -->
+<div id="results-section">
+  <div class="section-title" style="margin-top:36px">Tournament Schedule</div>
+  <div class="stats-bar" id="statsBar"></div>
+  <div class="quality-report" id="qualityReport"></div>
+  <div class="print-btns">
+    <button class="btn-print" onclick="printView('rounds')">🖨️ Print — Round Overview</button>
+    <button class="btn-print" onclick="printView('players')">🖨️ Print — Player Cards</button>
+  </div>
+  <div class="view-tabs">
+    <button class="vtab active" onclick="switchView('rounds',this)">By Round</button>
+    <button class="vtab" onclick="switchView('players',this)">By Player</button>
+  </div>
+  <div id="vRounds"></div>
+  <div id="vPlayers" style="display:none"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ COUNTRY DATA ══════════════════════════════════════════════════════
+// Code → flag emoji
+const CODE_FLAG = {
+  AL:'🇦🇱',AM:'🇦🇲',AT:'🇦🇹',AZ:'🇦🇿',BA:'🇧🇦',BE:'🇧🇪',BG:'🇧🇬',BY:'🇧🇾',
+  CH:'🇨🇭',CY:'🇨🇾',CZ:'🇨🇿',DE:'🇩🇪',DK:'🇩🇰',EE:'🇪🇪',ES:'🇪🇸',FI:'🇫🇮',
+  FR:'🇫🇷',GB:'🇬🇧',GE:'🇬🇪',GR:'🇬🇷',HR:'🇭🇷',HU:'🇭🇺',IE:'🇮🇪',IS:'🇮🇸',
+  IT:'🇮🇹',KZ:'🇰🇿',LI:'🇱🇮',LT:'🇱🇹',LU:'🇱🇺',LV:'🇱🇻',MC:'🇲🇨',MD:'🇲🇩',
+  ME:'🇲🇪',MK:'🇲🇰',MT:'🇲🇹',NL:'🇳🇱',NO:'🇳🇴',PL:'🇵🇱',PT:'🇵🇹',RO:'🇷🇴',
+  RS:'🇷🇸',RU:'🇷🇺',SE:'🇸🇪',SI:'🇸🇮',SK:'🇸🇰',SM:'🇸🇲',TR:'🇹🇷',UA:'🇺🇦',
+  UK:'🇬🇧',EU:'🇪🇺',XK:'🇽🇰'
+};
+// Full country name (sv + en, lowercase) → 2-letter code
+const NAME_CODE = {
+  'albanien':'AL','armenien':'AM','österrike':'AT','azerbajdzjan':'AZ',
+  'bosnien och hercegovina':'BA','bosnien':'BA','belgien':'BE','bulgarien':'BG',
+  'vitryssland':'BY','schweiz':'CH','cypern':'CY','tjeckien':'CZ','tjeckiska republiken':'CZ',
+  'tyskland':'DE','danmark':'DK','estland':'EE','spanien':'ES','finland':'FI',
+  'frankrike':'FR','storbritannien':'GB','england':'GB','georgien':'GE','grekland':'GR',
+  'kroatien':'HR','ungern':'HU','irland':'IE','island':'IS','italien':'IT',
+  'kazakstan':'KZ','liechtenstein':'LI','litauen':'LT','luxemburg':'LU','lettland':'LV',
+  'monaco':'MC','moldavien':'MD','moldova':'MD','montenegro':'ME','nordmakedonien':'MK',
+  'makedonien':'MK','malta':'MT','nederländerna':'NL','holland':'NL','norge':'NO',
+  'polen':'PL','portugal':'PT','rumänien':'RO','serbien':'RS','ryssland':'RU',
+  'sverige':'SE','slovenien':'SI','slovakien':'SK','san marino':'SM','turkiet':'TR',
+  'ukraina':'UA','kosovo':'XK',
+  'albania':'AL','armenia':'AM','austria':'AT','azerbaijan':'AZ',
+  'bosnia and herzegovina':'BA','bosnia':'BA','belgium':'BE','bulgaria':'BG',
+  'belarus':'BY','switzerland':'CH','cyprus':'CY','czech republic':'CZ','czechia':'CZ',
+  'germany':'DE','denmark':'DK','estonia':'EE','spain':'ES',
+  'france':'FR','great britain':'GB','united kingdom':'GB','uk':'GB',
+  'georgia':'GE','greece':'GR','croatia':'HR','hungary':'HU','ireland':'IE',
+  'iceland':'IS','italy':'IT','kazakhstan':'KZ','liechtenstein':'LI','lithuania':'LT',
+  'luxembourg':'LU','latvia':'LV','monaco':'MC','moldova':'MD','montenegro':'ME',
+  'north macedonia':'MK','macedonia':'MK','malta':'MT','netherlands':'NL','holland':'NL',
+  'norway':'NO','poland':'PL','portugal':'PT','romania':'RO','serbia':'RS',
+  'russia':'RU','sweden':'SE','slovenia':'SI','slovakia':'SK','san marino':'SM',
+  'turkey':'TR','ukraine':'UA','kosovo':'XK'
+};
+function countryToCode(raw) {
+  if (!raw) return 'EU';
+  const s = raw.toString().trim();
+  if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase(); // already a code
+  return NAME_CODE[s.toLowerCase()] || 'EU';
+}
+function flag(raw) {
+  return CODE_FLAG[countryToCode(raw)] || '🇪🇺';
+}
+function flagAndCode(raw) {
+  const code = countryToCode(raw);
+  return { f: CODE_FLAG[code] || '🇪🇺', code };
+}
+
+// ══ MAHJONG GROUP NAMES ═══════════════════════════════════════════════
+const MJNAMES = [
+  'Red Dragon','Green Dragon','White Dragon','Golden Wind','East Wind',
+  'West Wind','North Wind','South Wind','Bamboo Forest','Cherry Blossom',
+  'Jade Palace','Dragon Gate','Iron Wall','Mountain Top','Flowing River',
+  'Silver Moon','Thunder Hand','Rising Sun','Lotus Pond','Pearl River',
+  'Wild Winds','Riichi Masters','Tenpai Tigers','Kan Kings','Dora Hunters',
+  'Pinfu Players','Tsumo Warriors','Ron Raiders','Kokushi Clan','Chanta Hall'
+];
+
+// ══ STATE ═════════════════════════════════════════════════════════════
+let importedPlayers = [];   // { firstName, lastName, ema, country, club, team }
+let schedule = null;
+let players = [];
+
+// ══ TABLE COUNT AUTO-CALC ═════════════════════════════════════════════
+document.getElementById('numTables').addEventListener('input', function() {
+  if (!importedPlayers.length)
+    document.getElementById('numPlayers').value = (parseInt(this.value)||0) * 4;
+});
+
+// ══ DRAG & DROP ═══════════════════════════════════════════════════════
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+// ══ FILE HANDLING ══════════════════════════════════════════════════════
+async function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  let rows = [];
+
+  try {
+    if (ext === 'csv' || ext === 'txt') {
+      const text = await file.text();
+      rows = parseCSV(text);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      rows = await parseXLSX(file);
+    } else {
+      showToast('Unsupported file type', true); return;
+    }
+  } catch(e) {
+    showToast('Could not read file: ' + e.message, true); return;
+  }
+
+  // Filter header row if it looks like a header
+  if (rows.length && /^(first|name|player|förnamn)/i.test(String(rows[0][0]||''))) {
+    rows = rows.slice(1);
+  }
+
+  // Parse into player objects
+  importedPlayers = rows
+    .filter(r => r.some(c => c && String(c).trim()))
+    .map((r, i) => ({
+      firstName: clean(r[0]),
+      lastName:  clean(r[1]),
+      ema:       clean(r[2]),
+      country:   clean(r[3]).toUpperCase(),
+      club:      clean(r[4]),
+      team:      clean(r[5]),
+    }))
+    .filter(p => p.firstName || p.lastName);
+
+  if (!importedPlayers.length) {
+    showToast('No valid players found in file', true); return;
+  }
+
+  // Auto-set tables
+  const nT = Math.ceil(importedPlayers.length / 4);
+  document.getElementById('numTables').value = nT;
+  document.getElementById('numPlayers').value = importedPlayers.length;
+
+  renderPreview();
+  showToast(`✓ Imported ${importedPlayers.length} players`);
+}
+
+function clean(v) { return v !== undefined && v !== null ? String(v).trim() : ''; }
+
+function parseCSV(text) {
+  return text.split(/\r?\n/).filter(l=>l.trim()).map(line => {
+    // Handle quoted fields
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i=0; i<line.length; i++) {
+      const ch = line[i];
+      if (ch==='"') { inQ=!inQ; continue; }
+      if ((ch===',' || ch===';' || ch==='\t') && !inQ) { fields.push(cur); cur=''; continue; }
+      cur += ch;
+    }
+    fields.push(cur);
+    return fields;
+  });
+}
+
+async function parseXLSX(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        resolve(data);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function renderPreview() {
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = importedPlayers.map((p, i) => `
+    <tr>
+      <td style="font-family:'DM Mono',monospace;color:var(--muted)">${i+1}</td>
+      <td><strong>${p.firstName} ${p.lastName}</strong></td>
+      <td style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted)">${p.ema||'—'}</td>
+      <td>${(()=>{ const fc=flagAndCode(p.country); return `<span class="seat-flag">${fc.f}</span><span class="country-code">${p.country||'—'}</span>`; })()}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${p.club||'—'}</td>
+      <td>${p.team ? `<span class="team-tag">${p.team}</span>` : '<span class="no-team">auto</span>'}</td>
+    </tr>`).join('');
+
+  document.getElementById('previewTitle').textContent = `${importedPlayers.length} players imported`;
+  document.getElementById('importPreview').style.display = 'block';
+}
+
+function clearImport() {
+  importedPlayers = [];
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('numPlayers').value = (parseInt(document.getElementById('numTables').value)||5)*4;
+  showToast('Import cleared');
+}
+
+// ══ MANUAL TEAMS ══════════════════════════════════════════════════════
+function addTeam(name='', p1='', p2='', p3='', p4='') {
+  const used = Array.from(document.querySelectorAll('.tname')).map(i=>i.value);
+  const avail = MJNAMES.filter(n=>!used.includes(n));
+  const dName = name || avail[0] || 'Team '+(document.querySelectorAll('.team-row').length+1);
+  const row = document.createElement('div');
+  row.className = 'team-row';
+  row.innerHTML = `
+    <input class="tname" type="text" placeholder="Team name" value="${esc(dName)}">
+    <input class="pin" type="text" placeholder="Player 1" value="${esc(p1)}">
+    <input class="pin" type="text" placeholder="Player 2" value="${esc(p2)}">
+    <input class="pin" type="text" placeholder="Player 3" value="${esc(p3)}">
+    <input class="pin" type="text" placeholder="Player 4" value="${esc(p4)}">
+    <button class="btn-rm" onclick="this.parentElement.remove();updateTC()">✕</button>`;
+  document.getElementById('teamList').appendChild(row);
+  updateTC();
+}
+function updateTC() {
+  const n = document.querySelectorAll('.team-row').length;
+  document.getElementById('tcBadge').textContent = n+' team'+(n!==1?'s':'');
+}
+function esc(s) { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ══ BUILD PLAYER LIST ══════════════════════════════════════════════════
+function buildPlayers(numP) {
+  const ps = [];
+  const usedTeams = new Set();
+
+  if (importedPlayers.length) {
+    // From import
+    importedPlayers.forEach((imp, i) => {
+      const name = [imp.firstName, imp.lastName].filter(Boolean).join(' ') || 'Player '+(i+1);
+      const team = imp.team || null; // null = will be auto-assigned
+      if (team) usedTeams.add(team);
+      ps.push({
+        id: i+1, name,
+        firstName: imp.firstName, lastName: imp.lastName,
+        ema: imp.ema, country: imp.country, club: imp.club,
+        team: team || '__auto__'
+      });
+    });
+
+    // Group players with no team into Mahjong-named groups of 4
+    const avail = MJNAMES.filter(n=>!usedTeams.has(n));
+    let gi=0, gpos=0;
+    const noTeam = ps.filter(p=>p.team==='__auto__');
+    for (const p of noTeam) {
+      if (gpos===0) { if(gi>=avail.length) avail.push('Group '+(gi+1)); }
+      p.team = avail[gi]||'Group '+(gi+1);
+      gpos++;
+      if (gpos>=4){gpos=0;gi++;}
+    }
+
+    // Pad to multiple of 4 if needed
+    while (ps.length < numP) {
+      const gname = avail[gi]||'Group '+(gi+1);
+      ps.push({ id:ps.length+1, name:'Player '+(ps.length+1), team:gname,
+                firstName:'', lastName:'', ema:'', country:'', club:'' });
+      gpos++;
+      if(gpos>=4){gpos=0;gi++;}
+    }
+  } else {
+    // Manual teams
+    const teamRows = document.querySelectorAll('.team-row');
+    teamRows.forEach(row => {
+      const tname = row.querySelector('.tname').value.trim()||'Team';
+      usedTeams.add(tname);
+      row.querySelectorAll('.pin').forEach((inp,i) => {
+        if (ps.length < numP) {
+          ps.push({ id:ps.length+1, name:inp.value.trim()||tname+' P'+(i+1),
+                    team:tname, firstName:'', lastName:'', ema:'', country:'', club:'' });
+        }
+      });
+    });
+
+    // Auto-fill remaining
+    const avail = MJNAMES.filter(n=>!usedTeams.has(n));
+    let gi=0,gpos=0;
+    while (ps.length < numP) {
+      if(gpos===0 && gi>=avail.length) avail.push('Group '+(gi+1));
+      const gname=avail[gi]||'Group '+(gi+1);
+      ps.push({ id:ps.length+1, name:'Player '+(ps.length+1), team:gname,
+                firstName:'', lastName:'', ema:'', country:'', club:'' });
+      gpos++;
+      if(gpos>=4){gpos=0;gi++;}
+    }
+  }
+
+  return ps.slice(0, numP);
+}
+
+// ══ SEATING ALGORITHM ══════════════════════════════════════════════════
+function shuffle(a) {
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+function mk(a,b){return a<b?`${a},${b}`:`${b},${a}`;}
+
+function generateSchedule(pList, nTables, nRounds) {
+  const met={};
+  const eastCnt=new Array(pList.length+2).fill(0);
+  const rounds=[];
+
+  for(let r=0;r<nRounds;r++){
+    let ids=pList.map(p=>p.id);
+    let best=null,bestS=Infinity;
+    for(let att=0;att<120;att++){
+      shuffle(ids);
+      const t=greedyAssign(ids,nTables,met);
+      const s=scoreAssign(t,met);
+      if(s<bestS){bestS=s;best=t.map(x=>[...x]);}
+    }
+    const roundTables=best.map((seats,ti)=>{
+      const eastSeat=seats.reduce((b,id)=>eastCnt[id]<eastCnt[b]?id:b,seats[0]);
+      const idx=seats.indexOf(eastSeat);
+      const rot=[...seats.slice(idx),...seats.slice(0,idx)];
+      for(let i=0;i<rot.length;i++)for(let j=i+1;j<rot.length;j++){const k=mk(rot[i],rot[j]);met[k]=(met[k]||0)+1;}
+      eastCnt[eastSeat]++;
+      return{tableNum:ti+1,seats:rot,east:eastSeat};
+    });
+    rounds.push({round:r+1,tables:roundTables});
+  }
+  return{rounds,eastCnt,met};
+}
+
+function greedyAssign(ids,nTables,met){
+  const asgn=new Set(),tables=[];
+  for(let t=0;t<nTables;t++){
+    const tbl=[];
+    for(const id of ids){if(!asgn.has(id)){tbl.push(id);asgn.add(id);break;}}
+    while(tbl.length<4){
+      let best=null,bestS=Infinity;
+      for(const id of ids){
+        if(asgn.has(id))continue;
+        let s=0;
+        for(const t2 of tbl)s+=(met[mk(id,t2)]||0)**2*10;
+        if(s<bestS){bestS=s;best=id;}
+      }
+      if(best===null)for(const id of ids){if(!asgn.has(id)){best=id;break;}}
+      if(best===null)break;
+      tbl.push(best);asgn.add(best);
+    }
+    tables.push(tbl);
+  }
+  return tables;
+}
+
+function scoreAssign(tables,met){
+  let s=0;
+  for(const t of tables)for(let i=0;i<t.length;i++)for(let j=i+1;j<t.length;j++)
+    s+=(met[mk(t[i],t[j])]||0)**2*100;
+  return s;
+}
+
+// ══ GENERATE ══════════════════════════════════════════════════════════
+function generate(){
+  const nT=Math.min(30,Math.max(1,parseInt(document.getElementById('numTables').value)||5));
+  const nR=Math.min(12,Math.max(1,parseInt(document.getElementById('numRounds').value)||7));
+  const nP=importedPlayers.length ? Math.ceil(importedPlayers.length/4)*4 : nT*4;
+  document.getElementById('numTables').value=Math.ceil(nP/4);
+  document.getElementById('numPlayers').value=nP;
+
+  players=buildPlayers(nP);
+  schedule=generateSchedule(players,Math.ceil(nP/4),nR);
+
+  renderStats(nP,Math.ceil(nP/4),nR);
+  renderQuality(schedule);
+  renderRounds();
+  renderPlayers();
+
+  const rs=document.getElementById('results-section');
+  rs.style.display='block';
+  rs.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ══ RENDER ════════════════════════════════════════════════════════════
+function renderStats(nP,nT,nR){
+  document.getElementById('statsBar').innerHTML=`
+    <div class="stat"><div class="stat-val">${nP}</div><div class="stat-lbl">Players</div></div>
+    <div class="sdiv"></div>
+    <div class="stat"><div class="stat-val">${nT}</div><div class="stat-lbl">Tables</div></div>
+    <div class="sdiv"></div>
+    <div class="stat"><div class="stat-val">${nR}</div><div class="stat-lbl">Rounds</div></div>
+    <div class="sdiv"></div>
+    <div class="stat"><div class="stat-val">${nT*nR}</div><div class="stat-lbl">Total Games</div></div>
+    <div class="sdiv"></div>
+    <div class="stat"><div class="stat-val">${nR}</div><div class="stat-lbl">Games/Player</div></div>
+    <div class="sdiv"></div>
+    <div class="stat"><div class="stat-val">${(nP*(nP-1)/2).toLocaleString()}</div><div class="stat-lbl">Possible Pairs</div></div>`;
+}
+
+function renderQuality(sched){
+  const vals=Object.values(sched.met);
+  const rep=vals.filter(v=>v>1).length;
+  const mx=vals.length?Math.max(...vals):0;
+  const ec=sched.eastCnt.filter(v=>v>0);
+  const eMin=ec.length?Math.min(...ec):0,eMax=ec.length?Math.max(...ec):0;
+  const sp=eMax-eMin;
+  document.getElementById('qualityReport').innerHTML=`
+    <div class="quality-title">⚡ Schedule Quality</div>
+    <div class="quality-grid">
+      <div class="qi"><div class="qv ${rep===0?'qgood':rep<5?'qwarn':'qbad'}">${rep===0?'✓ Perfect':rep+' collisions'}</div><div class="ql">Repeated Encounters</div></div>
+      <div class="qi"><div class="qv ${mx<=1?'qgood':'qwarn'}">${mx}× max</div><div class="ql">Max Times Same Pair Met</div></div>
+      <div class="qi"><div class="qv ${sp<=1?'qgood':sp<=2?'qwarn':'qbad'}">${eMin}–${eMax} times</div><div class="ql">East Distribution Range</div></div>
+    </div>`;
+}
+
+const WINDS=['E','S','W','N'];
+
+function renderRounds(){
+  document.getElementById('vRounds').innerHTML=schedule.rounds.map(round=>`
+    <div class="round-section">
+      <div class="round-title">
+        <span class="round-badge">ROUND ${round.round}</span>
+        <h3>${round.tables.length} tables in play</h3>
+        <span class="rmeta">${round.tables.length*4} players seated</span>
+      </div>
+      <div class="tables-grid">
+        ${round.tables.map(table=>{
+          const firstTeam=players.find(p=>p.id===table.seats[0])?.team||'';
+          const sameTeam=table.seats.every(id=>players.find(p=>p.id===id)?.team===firstTeam);
+          return`<div class="table-card">
+            <div class="table-head">
+              <span class="table-num">TABLE ${table.tableNum}</span>
+              ${sameTeam?`<span class="table-tbadge">${firstTeam}</span>`:''}
+            </div>
+            <div class="seats">
+              ${table.seats.map((id,i)=>{
+                const p=players.find(p=>p.id===id);
+                const w=WINDS[i],isE=i===0;
+                const f=p&&p.country?flag(p.country):'';
+                const sub=p?[f&&`<span class="seat-flag">${f}</span>`,p.club].filter(Boolean).join(' '):'';
+                return`<div class="seat${isE?' east':''}">
+                  <div class="wbadge w${w}">${w}</div>
+                  <div class="seat-info">
+                    <div class="seat-name">${p?p.name:'#'+id}</div>
+                    ${sub?`<div class="seat-sub">${sub}</div>`:''}
+                  </div>
+                  <div class="seat-id">${id}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderPlayers(){
+  document.getElementById('vPlayers').innerHTML=`<div class="player-grid">${
+    players.map(player=>{
+      const rows=schedule.rounds.map(round=>{
+        let tNum=null,wind=null;
+        round.tables.forEach(t=>{const i=t.seats.indexOf(player.id);if(i!==-1){tNum=t.tableNum;wind=WINDS[i];}});
+        return`<div class="pr">
+          <span class="prr">R${round.round}</span>
+          <span class="prt">Table ${tNum}</span>
+          <span class="prw prw${wind}">${wind}</span>
+        </div>`;
+      }).join('');
+      const f=player.country?flag(player.country):'';
+      return`<div class="player-card">
+        <div class="player-head">
+          <div class="player-num">${player.id}</div>
+          <div class="player-info">
+            <h4>${f?f+' ':''} ${player.name}</h4>
+            <div class="pt">${player.team}</div>
+            ${player.ema?`<div class="pm">EMA: ${player.ema}</div>`:''}
+          </div>
+        </div>
+        <div class="player-sched">${rows}</div>
+      </div>`;
+    }).join('')
+  }</div>`;
+}
+
+function switchView(view,btn){
+  document.querySelectorAll('.vtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('vRounds').style.display=view==='rounds'?'block':'none';
+  document.getElementById('vPlayers').style.display=view==='players'?'block':'none';
+}
+function printView(view){
+  document.getElementById('vRounds').style.display=view==='rounds'?'block':'none';
+  document.getElementById('vPlayers').style.display=view==='players'?'block':'none';
+  window.print();
+  document.getElementById('vRounds').style.display='block';
+  document.getElementById('vPlayers').style.display='none';
+  document.querySelectorAll('.vtab')[0].classList.add('active');
+  document.querySelectorAll('.vtab')[1].classList.remove('active');
+}
+
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=err?'var(--red)':'var(--green)';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>

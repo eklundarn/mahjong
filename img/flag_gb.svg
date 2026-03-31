@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 14">
+  <!-- Blå bakgrund -->
+  <rect width="22" height="14" fill="#012169"/>
+  <!-- Diagonaler vit (St Andrew + St Patrick grund) -->
+  <line x1="0" y1="0" x2="22" y2="14" stroke="white" stroke-width="3"/>
+  <line x1="22" y1="0" x2="0" y2="14" stroke="white" stroke-width="3"/>
+  <!-- Diagonaler röd (St Patrick) -->
+  <line x1="0" y1="0" x2="22" y2="14" stroke="#C8102E" stroke-width="1.5"/>
+  <line x1="22" y1="0" x2="0" y2="14" stroke="#C8102E" stroke-width="1.5"/>
+  <!-- Vitt kors (St George grund) -->
+  <rect x="9" y="0" width="4" height="14" fill="white"/>
+  <rect x="0" y="5" width="22" height="4" fill="white"/>
+  <!-- Rött kors (St George) -->
+  <rect x="10" y="0" width="2" height="14" fill="#C8102E"/>
+  <rect x="0" y="6" width="22" height="2" fill="#C8102E"/>
+</svg>
