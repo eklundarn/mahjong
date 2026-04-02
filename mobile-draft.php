@@ -71,7 +71,7 @@ $stmt = $conn->query("
     SELECT id, first_name, last_name 
     FROM stat_players 
     WHERE club_member = 1 AND active = 1
-      AND id NOT IN 1, 2, 3
+      AND id NOT IN (1, 2, 3)
     ORDER BY first_name, last_name
 ");
 $all_players = $stmt->fetchAll();

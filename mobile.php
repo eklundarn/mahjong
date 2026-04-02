@@ -7,11 +7,8 @@
  * Upload: www/mobile.php
  */
 
-// Extend session lifetime to 4 hours for active game registration
-ini_set('session.gc_maxlifetime', 14400);
-if (session_status() === PHP_SESSION_NONE) {
-    session_set_cookie_params(14400);
-}
+// Session lifetime is handled by config.php (SESSION_LIFETIME setting)
+// The custom session path in config.php protects against shared hosting GC
 
 require_once 'config.php';
 
@@ -77,7 +74,7 @@ $stmt = $conn->query("
     SELECT id, first_name, last_name 
     FROM stat_players 
     WHERE club_member = 1 AND active = 1
-      AND id NOT IN 1, 2, 3
+      AND id NOT IN (1, 2, 3)
     ORDER BY first_name, last_name
 ");
 $all_players = $stmt->fetchAll();
@@ -1535,6 +1532,12 @@ async function draftPost(body) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
         });
+        if (r.status === 401) {
+            // Session expired — queue for later, don't lose data
+            console.warn('Session expired during draft post — queuing');
+            draftQueueAdd(body);
+            return;
+        }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
         if (!d.success) console.warn('Draft action failed:', d.error);
@@ -3147,14 +3150,31 @@ if (timerRunning && !timerInterval) {
 // Heartbeat every 2 minutes to keep session alive
 setInterval(() => {
     fetch('api/session_heartbeat.php')
-    .then(r => r.json())
+    .then(r => {
+        if (r.status === 401) {
+            // Session died — but we have data in localStorage, so DON'T reload
+            // Just show a subtle warning and try to re-auth silently
+            console.warn('Session expired — data is safe in localStorage');
+            const banner = document.getElementById('offlineBanner');
+            if (banner) {
+                banner.textContent = LANG === 'sv' 
+                    ? '⚠ Sessionen har gått ut — din data är sparad lokalt. Logga in igen för att synka.' 
+                    : '⚠ Session expired — your data is saved locally. Log in again to sync.';
+                banner.style.display = 'block';
+                banner.style.background = '#fff3e0';
+                banner.style.color = '#e65100';
+            }
+            return null;
+        }
+        return r.json();
+    })
     .then(data => {
-        if (!data.success || data.session_expired) {
-            try { saveTimerLocal(); autoSave(); } catch(e) {}
-            alert(LANG === 'sv' 
-                ? 'Din session har gått ut. Sidan laddas om för att logga in igen.' 
-                : 'Your session has expired. The page will reload to log in again.');
-            location.reload();
+        if (data && data.success) {
+            // Session is alive — hide any warning
+            const banner = document.getElementById('offlineBanner');
+            if (banner && banner.style.background === 'rgb(255, 243, 224)') {
+                banner.style.display = 'none';
+            }
         }
     })
     .catch(() => {}); // Network error, try again next interval
